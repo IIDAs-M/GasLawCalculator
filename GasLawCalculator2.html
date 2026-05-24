@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>温度圧力補正計算機</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1565C0">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="温圧計算機">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', 'Noto Sans JP', sans-serif;
+      background: #ECEFF1;
+      min-height: 100vh;
+      padding: 12px;
+    }
+
+    .container {
+      max-width: 540px;
+      margin: 0 auto;
+    }
+
+    /* ヘッダー */
+    .header {
+      text-align: center;
+      padding: 12px 8px 4px;
+    }
+    .header h1 {
+      font-size: 1.25rem;
+      color: #0D47A1;
+      font-weight: 700;
+    }
+    .formula {
+      margin-top: 6px;
+      font-size: 0.85rem;
+      color: #37474F;
+      font-style: italic;
+      letter-spacing: 0.03em;
+    }
+    .formula-note {
+      font-size: 0.75rem;
+      color: #78909C;
+      margin-top: 2px;
+    }
+    .pressure-note {
+      font-size: 0.75rem;
+      color: #78909C;
+      margin-top: 2px;
+    }
+
+    /* ガイドバナー */
+    .guide-banner {
+      background: #FFF3E0;
+      border-left: 4px solid #FF6D00;
+      color: #E65100;
+      font-size: 0.8rem;
+      padding: 7px 10px;
+      margin: 10px 0 8px;
+      border-radius: 0 6px 6px 0;
+    }
+
+    /* カード */
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+    .card-header {
+      background: #1565C0;
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 700;
+      text-align: center;
+      padding: 7px 12px;
+    }
+    .card-body {
+      padding: 10px 12px;
+    }
+
+    /* 入力行（計算変数） */
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 6px;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+    .row.selected {
+      background: #FFF9C4;
+    }
+    .row + .row {
+      border-top: 1px solid #F0F0F0;
+    }
+
+    /* 大気圧入力行 */
+    .atm-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 6px;
+      background: #E3F2FD;
+      border-top: 1px solid #BBDEFB;
+      border-radius: 0 0 6px 6px;
+    }
+    .atm-spacer {
+      width: 20px;
+      flex-shrink: 0;
+    }
+    .atm-row .atm-label {
+      flex: 1;
+      font-size: 0.85rem;
+      color: #1565C0;
+      font-weight: 600;
+    }
+
+    /* ラジオボタン */
+    .row input[type="radio"] {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+      flex-shrink: 0;
+      accent-color: #1565C0;
+    }
+
+    /* ラベル */
+    .row label {
+      flex: 1;
+      font-size: 0.95rem;
+      color: #212121;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    /* 数値入力（共通） */
+    input[type="text"] {
+      width: 108px;
+      padding: 6px 8px;
+      font-size: 0.95rem;
+      text-align: right;
+      border: 1px solid #B0BEC5;
+      border-radius: 5px;
+      background: #FAFAFA;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    input[type="text"]:focus {
+      border-color: #1565C0;
+      background: #fff;
+    }
+    input[type="text"]:disabled {
+      background: #EEEEEE;
+      color: #9E9E9E;
+      border-color: #E0E0E0;
+      cursor: default;
+    }
+    input[type="text"].calc-target {
+      background: #FFF9C4;
+      border-color: #F9A825;
+      color: #555;
+      font-style: italic;
+    }
+    /* 大気圧入力フィールド */
+    input[type="text"].atm-input {
+      border-color: #90CAF9;
+      background: #fff;
+    }
+    input[type="text"].atm-input:focus {
+      border-color: #1565C0;
+    }
+
+    /* 単位 */
+    .unit {
+      width: 44px;
+      font-size: 0.85rem;
+      color: #546E7A;
+      flex-shrink: 0;
+      line-height: 1.3;
+    }
+    .unit .gauge-label {
+      display: block;
+      font-size: 0.65rem;
+      color: #E65100;
+      font-weight: 700;
+    }
+
+    /* 計算ボタン */
+    .btn-calc {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      color: #fff;
+      background: #1565C0;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      margin-bottom: 10px;
+      box-shadow: 0 3px 8px rgba(21,101,192,0.35);
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn-calc:hover  { background: #1976D2; }
+    .btn-calc:active { transform: scale(0.98); }
+
+    /* 結果表示 */
+    .result-card {
+      display: none;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+      margin-bottom: 10px;
+    }
+    .result-card.ok  { background: #E8F5E9; }
+    .result-card.err { background: #FFEBEE; }
+    .result-inner {
+      padding: 16px;
+      text-align: center;
+      font-size: 1rem;
+      font-weight: 700;
+      line-height: 1.7;
+    }
+    .result-card.ok  .result-inner { color: #1B5E20; }
+    .result-card.err .result-inner { color: #B71C1C; }
+
+    /* フッター */
+    .footer {
+      text-align: center;
+      font-size: 0.7rem;
+      color: #90A4AE;
+      padding: 4px 0 16px;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>温度圧力補正計算機</h1>
+    <div class="formula">( P<sub>A</sub> &times; V<sub>A</sub> ) / T<sub>A</sub> &nbsp;=&nbsp; ( P<sub>B</sub> &times; V<sub>B</sub> ) / T<sub>B</sub></div>
+    <div class="formula-note">※ 温度はケルビン換算（K = ℃ + 273.15）</div>
+    <div class="pressure-note">※ 圧力はゲージ圧入力（絶対圧 = ゲージ圧 + 大気圧）</div>
+  </div>
+
+  <div class="guide-banner">▶ 算出する項目の ○ を選択し、残りの数値を入力してください</div>
+
+  <!-- 状態 A -->
+  <div class="card">
+    <div class="card-header">状態 A（補正前）</div>
+    <div class="card-body">
+      <div class="row" id="row-0">
+        <input type="radio" name="target" id="r0" value="0">
+        <label for="r0">温度&emsp;T<sub>A</sub></label>
+        <input type="text" id="v0" value="25" inputmode="decimal">
+        <span class="unit">℃</span>
+      </div>
+      <div class="row" id="row-1">
+        <input type="radio" name="target" id="r1" value="1">
+        <label for="r1">圧力&emsp;P<sub>A</sub></label>
+        <input type="text" id="v1" value="150" inputmode="decimal">
+        <span class="unit">kPa<span class="gauge-label">ゲージ</span></span>
+      </div>
+      <div class="atm-row">
+        <span class="atm-spacer"></span>
+        <span class="atm-label">大気圧&emsp;Atm<sub>A</sub></span>
+        <input type="text" id="atm-a" value="101.325" inputmode="decimal" class="atm-input">
+        <span class="unit">kPa</span>
+      </div>
+      <div class="row" id="row-2">
+        <input type="radio" name="target" id="r2" value="2">
+        <label for="r2">体積&emsp;V<sub>A</sub></label>
+        <input type="text" id="v2" value="1" inputmode="decimal">
+        <span class="unit">m³</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 状態 B -->
+  <div class="card">
+    <div class="card-header">状態 B（補正後）</div>
+    <div class="card-body">
+      <div class="row" id="row-3">
+        <input type="radio" name="target" id="r3" value="3">
+        <label for="r3">温度&emsp;T<sub>B</sub></label>
+        <input type="text" id="v3" value="15" inputmode="decimal">
+        <span class="unit">℃</span>
+      </div>
+      <div class="row" id="row-4">
+        <input type="radio" name="target" id="r4" value="4">
+        <label for="r4">圧力&emsp;P<sub>B</sub></label>
+        <input type="text" id="v4" value="0.981" inputmode="decimal">
+        <span class="unit">kPa<span class="gauge-label">ゲージ</span></span>
+      </div>
+      <div class="atm-row">
+        <span class="atm-spacer"></span>
+        <span class="atm-label">大気圧&emsp;Atm<sub>B</sub></span>
+        <input type="text" id="atm-b" value="101.325" inputmode="decimal" class="atm-input">
+        <span class="unit">kPa</span>
+      </div>
+      <div class="row" id="row-5">
+        <input type="radio" name="target" id="r5" value="5" checked>
+        <label for="r5">体積&emsp;V<sub>B</sub></label>
+        <input type="text" id="v5" placeholder="← 計算" disabled class="calc-target">
+        <span class="unit">m³</span>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-calc" onclick="calculate()">計　算　す　る</button>
+
+  <div class="result-card" id="result-card">
+    <div class="result-inner" id="result-text"></div>
+  </div>
+
+  <div class="footer">温度圧力補正計算機　／　ボイル＝シャルルの法則</div>
+</div>
+
+<script>
+  const LABELS  = ["状態Aの温度", "状態Aの圧力", "状態Aの体積",
+                   "状態Bの温度", "状態Bの圧力", "状態Bの体積"];
+  const UNITS   = ["℃", "kPa", "m³", "℃", "kPa", "m³"];
+  const IS_TEMP = [true,  false, false, true,  false, false];
+  const IS_PRES = [false, true,  false, false, true,  false];
+
+  let selectedIndex = 5;
+
+  document.querySelectorAll('input[name="target"]').forEach(radio => {
+    radio.addEventListener('change', () => selectTarget(parseInt(radio.value)));
+  });
+
+  function selectTarget(index) {
+    selectedIndex = index;
+    for (let i = 0; i < 6; i++) {
+      const row   = document.getElementById('row-' + i);
+      const input = document.getElementById('v' + i);
+      if (i === index) {
+        row.classList.add('selected');
+        input.disabled = true;
+        input.value = '';
+        input.placeholder = '← 計算';
+        input.classList.add('calc-target');
+      } else {
+        row.classList.remove('selected');
+        input.disabled = false;
+        input.placeholder = '0';
+        input.classList.remove('calc-target');
+      }
+    }
+    hideResult();
+  }
+
+  function hideResult() {
+    document.getElementById('result-card').style.display = 'none';
+  }
+
+  function showResult(msg, isOk) {
+    const card = document.getElementById('result-card');
+    card.className = 'result-card ' + (isOk ? 'ok' : 'err');
+    card.style.display = 'block';
+    document.getElementById('result-text').innerHTML = msg;
+  }
+
+  function readAtm(id, label) {
+    const str = document.getElementById(id).value.trim();
+    const v = parseFloat(str);
+    if (str === '' || isNaN(v) || v <= 0) {
+      showResult('エラー：' + label + ' に正の値を入力してください', false);
+      return null;
+    }
+    return v;
+  }
+
+  function calculate() {
+    // 大気圧の読み取りと検証
+    const atmA = readAtm('atm-a', '状態Aの大気圧');
+    if (atmA === null) return;
+    const atmB = readAtm('atm-b', '状態Bの大気圧');
+    if (atmB === null) return;
+
+    // 6変数の読み取りと検証
+    const raw = new Array(6).fill(0);
+    for (let i = 0; i < 6; i++) {
+      if (i === selectedIndex) continue;
+      const str = document.getElementById('v' + i).value.trim();
+      const v = parseFloat(str);
+      if (str === '' || isNaN(v)) {
+        showResult('エラー：' + LABELS[i] + ' に有効な数値を入力してください', false);
+        return;
+      }
+      if (IS_TEMP[i]) {
+        if (v <= -273.15) {
+          showResult('エラー：' + LABELS[i] + ' は -273.15 ℃ より大きい値を入力してください', false);
+          return;
+        }
+      } else if (IS_PRES[i]) {
+        const atmLimit = (i === 1) ? atmA : atmB;
+        if (v <= -atmLimit) {
+          showResult('エラー：' + LABELS[i] + ' は ' + (-atmLimit).toFixed(3) + ' kPa より大きい値を入力してください', false);
+          return;
+        }
+      } else {
+        if (v <= 0) {
+          showResult('エラー：' + LABELS[i] + ' は正の値（0 より大きい数）を入力してください', false);
+          return;
+        }
+      }
+      raw[i] = v;
+    }
+
+    // (PA×VA)/TA = (PB×VB)/TB  ※T はケルビン、P は絶対圧（ゲージ圧 + 大気圧）
+    const tA = selectedIndex !== 0 ? raw[0] + 273.15 : 0;
+    const pA = selectedIndex !== 1 ? raw[1] + atmA   : 0;  // ゲージ圧→絶対圧
+    const vA = selectedIndex !== 2 ? raw[2]           : 0;
+    const tB = selectedIndex !== 3 ? raw[3] + 273.15 : 0;
+    const pB = selectedIndex !== 4 ? raw[4] + atmB   : 0;  // ゲージ圧→絶対圧
+    const vB = selectedIndex !== 5 ? raw[5]           : 0;
+
+    let result;
+    switch (selectedIndex) {
+      case 0: result = pA * vA * tB / (pB * vB) - 273.15; break; // TA(℃)
+      case 1: result = pB * vB * tA / (vA * tB) - atmA;   break; // PA ゲージ圧
+      case 2: result = pB * vB * tA / (pA * tB);           break; // VA
+      case 3: result = pB * vB * tA / (pA * vA) - 273.15; break; // TB(℃)
+      case 4: result = pA * vA * tB / (tA * vB) - atmB;   break; // PB ゲージ圧
+      case 5: result = pA * vA * tB / (tA * pB);           break; // VB
+    }
+
+    if (!isFinite(result)) {
+      showResult('エラー：計算できません（ゼロ除算の可能性があります）', false);
+      return;
+    }
+
+    const atmResult = (selectedIndex === 1) ? atmA : atmB;
+    if (IS_TEMP[selectedIndex] && result <= -273.15) {
+      showResult('エラー：計算結果が絶対零度（-273.15 ℃）以下になります。入力値を確認してください。', false);
+      return;
+    }
+    if (IS_PRES[selectedIndex] && result <= -atmResult) {
+      showResult('エラー：計算結果のゲージ圧が ' + (-atmResult).toFixed(3) + ' kPa 以下（絶対圧が負）になります。入力値を確認してください。', false);
+      return;
+    }
+    if (!IS_TEMP[selectedIndex] && !IS_PRES[selectedIndex] && result <= 0) {
+      showResult('エラー：計算結果が負または零になります。入力値を確認してください。', false);
+      return;
+    }
+
+    const formatted = formatNumber(result);
+    document.getElementById('v' + selectedIndex).value = formatted;
+
+    const unitLabel = IS_PRES[selectedIndex] ? 'kPa（ゲージ圧）' : UNITS[selectedIndex];
+    showResult('【計算結果】<br>' + LABELS[selectedIndex] + ' = ' + formatted + ' ' + unitLabel, true);
+  }
+
+  function formatNumber(value) {
+    const abs = Math.abs(value);
+    if (abs >= 1e7 || (abs > 0 && abs < 0.001)) {
+      return value.toExponential(6);
+    }
+    const s = parseFloat(value.toPrecision(7)).toString();
+    const parts = s.split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return parts.join('.');
+  }
+
+  selectTarget(5);
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
+</script>
+</body>
+</html>
